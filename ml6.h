@@ -12,6 +12,7 @@ Creates the point structure in order to represent a pixel as a color triple
 
 #define XRES 500
 #define YRES 500
+#define CYRES 499
 #define MAX_COLOR 255
 #define DEFAULT_COLOR 0
 

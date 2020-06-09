@@ -24,9 +24,9 @@ void add_box(struct matrix *tris,
              double x, double y, double z,
              double width, double height, double depth)
 {
-  const double tx = x+width;
-  const double ty = y-height;
-  const double tz = z-depth;
+  double tx = x+width;
+  double ty = y-height;
+  double tz = z-depth;
 
   //FRONT FACE
   add_tri(tris,
@@ -102,22 +102,18 @@ void add_sphere(struct matrix *tris,
                 double r, int step)
 {
   struct matrix *sphere = generate_sphere(cx, cy, cz, r, step);
-  int point;
-  const int stp = (step+1);
-  for (point = 0; point < sphere->lastcol - stp; point++)
+  int p1,p2,p3,p4;
+  int stp = (step+1);
+  int end = sphere->lastcol - stp;
+  double * x = sphere->m[0];
+  double * y = sphere->m[1];
+  double * z = sphere->m[2];
+  for (p1 = 0, p2 = 1, p3 = stp,p4 = step; p1 < end; ++p1, ++p2, ++p3, ++p4)
   {
-    if(point % (stp) != 0){
-      add_tri(tris, sphere->m[0][point], sphere->m[1][point], sphere->m[2][point],
-                    sphere->m[0][point+stp], sphere->m[1][point+stp], sphere->m[2][point+stp],
-                    sphere->m[0][point+step], sphere->m[1][point+step], sphere->m[2][point+step]
-              );
-    }
-    if((point+1) % (stp) != 0){
-            add_tri(tris, sphere->m[0][point], sphere->m[1][point], sphere->m[2][point],
-                    sphere->m[0][point+1], sphere->m[1][point+1], sphere->m[2][point+1],
-                    sphere->m[0][point+stp], sphere->m[1][point+stp], sphere->m[2][point+stp]
-              );
-    }
+    if(p1 % stp)
+      add_tri(tris, x[p1], y[p1], z[p1],x[p3], y[p3], z[p3],x[p4], y[p4], z[p4]);
+    if(p2 % stp)
+      add_tri(tris, x[p1], y[p1], z[p1],x[p2], y[p2], z[p2],x[p3], y[p3], z[p3]);
   }
 }
 
@@ -138,16 +134,16 @@ struct matrix *generate_sphere(double cx, double cy, double cz,
 {
 
   struct matrix *sphere = new_matrix(4, 0);
-  int cir = -1;
-  int p = -1;
-
+  double cir = -1;
+  double p = -1;
+  double p1,cir1;
   while (++p <= step)
   {
     cir = -1;
     while (++cir <= step)
     {
-      double p1 = (double)p / step * M_PI * 2;
-      double cir1 = (double)cir / step * M_PI;
+      p1 = p / step * M_PI * 2;
+      cir1 = cir / step * M_PI;
       add_point(sphere, cx + r * cos(cir1), cy + r * sin(cir1) * cos(p1), cz + r * sin(cir1) * sin(p1));
     }
   }
@@ -175,7 +171,7 @@ void add_torus(struct matrix *tris,
 {
   struct matrix *torus = generate_torus(cx, cy, cz, r1, r2, step);
   int point;
-  const int stp = (step+1);
+  int stp = (step+1);
   for (point = 0; point < torus->lastcol - stp; point++)
   {
     if((point+1)%stp != 0){
@@ -419,24 +415,20 @@ to the screen
 ====================*/
 void draw_tris(struct matrix *points,zbuffer zbuf, screen s, color c)
 {
-  const int last = points->lastcol;
+  int last = points->lastcol;
   if (last < 3)
-  {
-    printf("Need at least 3 points to draw a tri!\n");
-    return;
-  }
+    return printf("Need at least 3 points to draw a tri!\n");
   if (last % 3)
-  {
-    printf("ERROR: Invalid input for triangle matrix \n");
-    return;
-  }
-  int point;
-  for (point = 0; point < last - 2; point += 3)
-  {
-    draw_tri(points->m[0][point],points->m[1][point],points->m[2][point],
-             points->m[0][point+1],points->m[1][point+1],points->m[2][point+1],
-             points->m[0][point+2],points->m[1][point+2],points->m[2][point+2],zbuf, s,c);
-  }
+    return printf("ERROR: Invalid input for triangle matrix \n");
+  int p1,p2,p3;
+  int rl = last - 2;
+  double * x = points->m[0];
+  double * y = points->m[1];
+  double * z = points->m[2];
+  for (p1 = 0,p2=1 , p3=2; p1 < rl; p1 +=3,p2+=3,p3+=3)
+    draw_tri(x[p1],y[p1],z[p1],
+             x[p2],y[p2],z[p2],
+             x[p3],y[p3],z[p3],zbuf, s,c);
 } // end draw_tris
 
 //extra functions just to make code a bit more manageable
@@ -478,27 +470,29 @@ void draw_tri(double x0,double y0,double z0,double x1,double y1,double z1,double
                         }else{bx = x0;by = y0;bz = z0;mx = x1;my = y1;mz = z1;}
         break;
     }
-    const double d0y = (ty-by+1);
-    const double d1y = (my-by+1);
-    const double d2y = (ty-my+1);
-    const double dx = (tx-bx) / d0y;
-    const double dz = (tz-bz) / d0y;
-    const double  dmx = (mx-bx)/ d1y;
-    const double  dmz = (mz-bz)/ d1y;
-    const double  dtx = (tx-mx)/ d2y;
-    const double  dtz = (tz-mz)/ d2y;
+    double d0y = (ty-by+1);
+    double d1y = (my-by+1);
+    double d2y = (ty-my+1);
+    double dx = (tx-bx) / d0y;
+    double dz = (tz-bz) / d0y;
+    double  dmx = (mx-bx)/ d1y;
+    double  dmz = (mz-bz)/ d1y;
+    double  dtx = (tx-mx)/ d2y;
+    double  dtz = (tz-mz)/ d2y;
     int y = by;
-    double kx0,kz0,kx1,kz1;
+    double kx0,kz0,kx1,kz1,f0,f1;
     kx0 = bx;
     kx1 = kx0;
     kz0 = bz;
     kz1 = kz0;
-    const int hy = my;
-    const int gy = ty;
+    f0 = (dmz-dz)/(dmx-dx+1);
+    f1 = (dtz-dz)/(dtx-dx+1);
+    int hy = my;
+    int gy = ty;
     color c = genColor();
     //this should save some time
     while(y != hy){
-      sline(kx0,kx1,kz0,kz1,++y,zbuf, s,c);
+      sline(kx0,kx1,kz0,kz1,f0,++y,zbuf, s,c);
       kx0 += dx;
       kz0 += dz;
       kx1 += dmx;
@@ -507,7 +501,7 @@ void draw_tri(double x0,double y0,double z0,double x1,double y1,double z1,double
     kx1 = mx;
     kz1 = mz;
     while(y <= gy){
-      sline(kx0,kx1,kz0,kz1,++y,zbuf,s,c);
+      sline(kx0,kx1,kz0,kz1,f1,++y,zbuf,s,c);
       kx0 += dx;
       kz0 += dz;
       kx1 += dtx;
@@ -523,14 +517,12 @@ color genColor(){
     c.blue = 200 + random()* 55;
     return c;
 }
-void sline(int x0, int x1, double z0, double z1, int y,zbuffer zbuf, screen s, color c){
-  if(x0>x1){
-    sline(x1,x0,z1,z0,y,zbuf, s,c);
-  }
-  const double diff = (z1-z0)/(x1-x0+1);
+void sline(int x0, int x1, double z0, double z1,double r, int y,zbuffer zbuf, screen s, color c){
+  if(x0>x1)
+    sline(x1,x0,z1,z0,r,y,zbuf, s,c);
   while(x0 <= x1){
     plot(zbuf,s,c,x0++,y, z0);
-    z0 += diff;
+    z0 += r;
   }
 }
 void draw_line(int x0, int y0, int x1, int y1,double z0, double z1, zbuffer zbuf, screen s, color c)
@@ -557,7 +549,7 @@ void draw_line(int x0, int y0, int x1, int y1,double z0, double z1, zbuffer zbuf
 
   //octants 1 and 8
   if (abs(x1 - x0) >= abs(y1 - y0)){
-    const double diff = (z1-z0)/(x1-x0+1);
+    double diff = (z1-z0)/(x1-x0+1);
     //octant 1
     if (A > 0)
     {
@@ -603,7 +595,7 @@ void draw_line(int x0, int y0, int x1, int y1,double z0, double z1, zbuffer zbuf
   //octants 2 and 7
   else
   {
-    const double diff = (z1-z0)/(y1-y0+1);
+    double diff = (z1-z0)/(y1-y0+1);
     //octant 2
     if (A > 0)
     {
