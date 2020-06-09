@@ -29,10 +29,12 @@ of s that get set. For example, using s[x][YRES-1-y] will have
 pixel 0, 0 located at the lower left corner of the screen
 ====================*/
 void plot( zbuffer zbuf, screen s, color c, int x, int y, double z) {
-  int newy = CYRES - y;
-  if (x >= 0 && x < XRES && newy >=0 && newy < YRES && z > zbuf[x][y].value){
-    zbuf[x][y].value = z;
-    s[x][newy] = c;
+  int newy = YRES - 1 - y;
+  if (x >= 0 && x < XRES && newy >=0 && newy < YRES){
+    if(z > zbuf[x][y].value){
+      zbuf[x][y].value = z;
+      s[x][newy] = c;
+    }
   }
 }
 
@@ -50,17 +52,18 @@ void clear_screen( screen s ) {
   c.green = DEFAULT_COLOR;
   c.blue = DEFAULT_COLOR;
 
-  for ( y=0; y < YRES; ++y)
-    for ( x=0; x < XRES; ++x)      
+  for ( y=0; y < YRES; y++ )
+    for ( x=0; x < XRES; x++)      
       s[x][y] = c;
 }
 void clear_zbuf(zbuffer zbuf){
   int x, y;
   meta val;
   val.value = -DBL_MAX;
-  for ( y=0; y < YRES; ++y)
-    for ( x=0; x < XRES; ++x)    
+  for ( y=0; y < YRES; y++ )
+    for ( x=0; x < XRES; x++){      
       zbuf[x][y] = val;
+    }
 }
 
 /*======== void save_ppm() ==========
