@@ -6,6 +6,7 @@
 #include "draw.h"
 #include "matrix.h"
 #include "math.h"
+#include "gmath.h"
 
 /*======== void add_box() ==========
   Inputs:   struct matrix * tris
@@ -391,24 +392,6 @@ void draw_lines(struct matrix *points, zbuffer zbuf, screen s, color c)
               zbuf, s, c);
 } // end draw_lines
 
-int check_valid_tri(double x0, double y0, double z0,
-             double x1, double y1, double z1,
-             double x2, double y2, double z2){
-
-            double ax = x1-x0;
-            double ay = y1-y0;
-            double az = z1-z0;
-
-            double bx = x2-x0;
-            double by = y2-y0;
-            double bz = z2-z0;
-
-            double nx = ay*bz - az*by;
-            double ny = az*bx - ax*bz;
-            double nz = ax*by - ay*bx;
-            return (nz > 0);
-}
-
 /*======== void draw_tris() ==========
 Inputs:   struct matrix * points
          screen s
@@ -417,7 +400,7 @@ Returns:
 Go through points 2 at a time and call draw_line to add that line
 to the screen
 ====================*/
-void draw_tris(struct matrix *points,zbuffer zbuf, screen s, color c)
+void draw_tris(struct matrix *points,zbuffer zbuf, screen s, double *view, color alight, double light[2][3], double *areflect, double *dreflect, double *sreflect)
 {
   const int last = points->lastcol;
   if (last < 3)
@@ -433,9 +416,13 @@ void draw_tris(struct matrix *points,zbuffer zbuf, screen s, color c)
   int point;
   for (point = 0; point < last - 2; point += 3)
   {
-    draw_tri(points->m[0][point],points->m[1][point],points->m[2][point],
-             points->m[0][point+1],points->m[1][point+1],points->m[2][point+1],
-             points->m[0][point+2],points->m[1][point+2],points->m[2][point+2],zbuf, s,c);
+    double * normal = calculate_normal(points,point);
+    if(normal[2]>0){
+      color c = get_lighting(normal,view, alight, light, areflect, dreflect, sreflect);
+      draw_tri(points->m[0][point],points->m[1][point],points->m[2][point],
+              points->m[0][point+1],points->m[1][point+1],points->m[2][point+1],
+              points->m[0][point+2],points->m[1][point+2],points->m[2][point+2],zbuf, s, c);
+    }
   }
 } // end draw_tris
 
@@ -458,70 +445,58 @@ int getT(int x0, int x1, int x2, int y0, int y1, int y2){
   return 2;
 }
 
-void draw_tri(double x0,double y0,double z0,double x1,double y1,double z1,double x2,double y2,double z2,zbuffer zbuf, screen s, color c){
-  if(check_valid_tri(x0,y0,z0,x1,y1,z1,x2,y2,z2)){
-    double tx,ty,tz,bx,by,bz,mx,my,mz;
-    switch(getT(x0,x1,x2,y0,y1,y2)){
-      case 0:
-        tx = x0;ty = y0;tz = z0;
-        if(getB(x1,x2,y1,y2)){bx = x2;by = y2;bz = z2;mx = x1;my = y1;mz = z1;
-                        }else{bx = x1;by = y1;bz = z1;mx = x2;my = y2;mz = z2;}
-        break;
-      case 1:
-        tx = x1;ty = y1;tz = z1;
-        if(getB(x0,x2,y0,y2)){bx = x2;by = y2;bz = z2;mx = x0;my = y0;mz = z0;
-                        }else{bx = x0;by = y0;bz = z0;mx = x2;my = y2;mz = z2;}
-        break;
-      default:
-        tx = x2;ty = y2;tz = z2;
-        if(getB(x0,x1,y0,y1)){bx = x1;by = y1;bz = z1;mx = x0;my = y0;mz = z0;
-                        }else{bx = x0;by = y0;bz = z0;mx = x1;my = y1;mz = z1;}
-        break;
-    }
-    const double d0y = (ty-by+1);
-    const double d1y = (my-by+1);
-    const double d2y = (ty-my+1);
-    const double dx = (tx-bx) / d0y;
-    const double dz = (tz-bz) / d0y;
-    const double  dmx = (mx-bx)/ d1y;
-    const double  dmz = (mz-bz)/ d1y;
-    const double  dtx = (tx-mx)/ d2y;
-    const double  dtz = (tz-mz)/ d2y;
-    int y = by;
-    double kx0,kz0,kx1,kz1;
-    kx0 = bx;
-    kx1 = kx0;
-    kz0 = bz;
-    kz1 = kz0;
-    const int hy = my;
-    const int gy = ty;
-    color c = genColor();
-    //this should save some time
-    while(y != hy){
-      sline(kx0,kx1,kz0,kz1,++y,zbuf, s,c);
-      kx0 += dx;
-      kz0 += dz;
-      kx1 += dmx;
-      kz1 += dmz;
-    }
-    kx1 = mx;
-    kz1 = mz;
-    while(y <= gy){
-      sline(kx0,kx1,kz0,kz1,++y,zbuf,s,c);
-      kx0 += dx;
-      kz0 += dz;
-      kx1 += dtx;
-      kz1 += dtz;
-    }
-    
+void draw_tri(double x0,double y0,double z0,double x1,double y1,double z1,double x2,double y2,double z2,zbuffer zbuf, screen s,color c){
+  double tx,ty,tz,bx,by,bz,mx,my,mz;
+  switch(getT(x0,x1,x2,y0,y1,y2)){
+    case 0:
+      tx = x0;ty = y0;tz = z0;
+      if(getB(x1,x2,y1,y2)){bx = x2;by = y2;bz = z2;mx = x1;my = y1;mz = z1;
+                      }else{bx = x1;by = y1;bz = z1;mx = x2;my = y2;mz = z2;}
+      break;
+    case 1:
+      tx = x1;ty = y1;tz = z1;
+      if(getB(x0,x2,y0,y2)){bx = x2;by = y2;bz = z2;mx = x0;my = y0;mz = z0;
+                      }else{bx = x0;by = y0;bz = z0;mx = x2;my = y2;mz = z2;}
+      break;
+    default:
+      tx = x2;ty = y2;tz = z2;
+      if(getB(x0,x1,y0,y1)){bx = x1;by = y1;bz = z1;mx = x0;my = y0;mz = z0;
+                      }else{bx = x0;by = y0;bz = z0;mx = x1;my = y1;mz = z1;}
+      break;
   }
-}
-color genColor(){
-    color c;
-    c.red = 200 + random()* 55;
-    c.green = 200 + random()* 55;
-    c.blue = 200 + random()* 55;
-    return c;
+  const double d0y = (ty-by+1);
+  const double d1y = (my-by+1);
+  const double d2y = (ty-my+1);
+  const double dx = (tx-bx) / d0y;
+  const double dz = (tz-bz) / d0y;
+  const double  dmx = (mx-bx)/ d1y;
+  const double  dmz = (mz-bz)/ d1y;
+  const double  dtx = (tx-mx)/ d2y;
+  const double  dtz = (tz-mz)/ d2y;
+  int y = by;
+  double kx0,kz0,kx1,kz1;
+  kx0 = bx;
+  kx1 = kx0;
+  kz0 = bz;
+  kz1 = kz0;
+  const int hy = my;
+  const int gy = ty;
+  while(y != hy){
+    sline(kx0,kx1,kz0,kz1,++y,zbuf, s,c);
+    kx0 += dx;
+    kz0 += dz;
+    kx1 += dmx;
+    kz1 += dmz;
+  }
+  kx1 = mx;
+  kz1 = mz;
+  while(y <= gy){
+    sline(kx0,kx1,kz0,kz1,++y,zbuf,s,c);
+    kx0 += dx;
+    kz0 += dz;
+    kx1 += dtx;
+    kz1 += dtz;
+  } 
 }
 void sline(int x0, int x1, double z0, double z1, int y,zbuffer zbuf, screen s, color c){
   if(x0>x1){

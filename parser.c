@@ -74,10 +74,17 @@ int check_str(char * line, char * value){
   return strncmp(line, value, strlen(line)) == 0;
 }
 
-void mul_tris(struct stack * gstack, struct matrix * tris, zbuffer zbuf, screen s , color c){
+void mul_tris(struct stack * gstack, struct matrix * tris, zbuffer zbuf, screen s , double *view,
+                                            color ambient, double light[2][3],
+                                            double *areflect,
+                                            double *dreflect,
+                                            double *sreflect){
   struct matrix * tmp = peek(gstack);
       matrix_mult(tmp, tris);
-      draw_tris(tris, zbuf, s,c);
+      draw_tris(tris,zbuf, s, view, ambient, light,
+               areflect,
+               dreflect, 
+               sreflect);
       tris->lastcol = 0;
 }
 
@@ -94,7 +101,9 @@ void parse_file ( char * filename,
                   struct matrix * edges,
                   struct matrix * tris,
                   screen s,
-                  zbuffer zbuf) {
+                  zbuffer zbuf,
+                  double *view, color ambient, double light[2][3],
+                  double *areflect,double *dreflect,double *sreflect) {
 
   FILE *f;
   char line[255];
@@ -121,7 +130,7 @@ void parse_file ( char * filename,
     double theta;
     char axis;
     int type;
-    int step = 20;
+    int step = 200;
 
     //circle
     if (check_str(line, "circle")) {
@@ -165,7 +174,10 @@ void parse_file ( char * filename,
                   xvals+1, yvals+1, zvals+1);
       add_box(tris, xvals[0], yvals[0], zvals[0],
                 xvals[1], yvals[1], zvals[1]);
-      mul_tris(gstack, tris,zbuf,s,c);
+      mul_tris(gstack, tris,zbuf,s,view, ambient, light,
+               areflect,
+               dreflect, 
+               sreflect);
     }
     
     //sphere
@@ -174,7 +186,10 @@ void parse_file ( char * filename,
       sscanf(line, "%lf %lf %lf %lf",
                     xvals, yvals, zvals,&r);     
       add_sphere(tris, xvals[0], yvals[0], zvals[0],r,step);
-      mul_tris(gstack, tris,zbuf, s,c);
+      mul_tris(gstack, tris,zbuf, s,view, ambient, light,
+               areflect,
+               dreflect, 
+               sreflect);
     }
 
     //torus
@@ -184,7 +199,10 @@ void parse_file ( char * filename,
                     xvals, yvals, zvals,xvals+1, yvals+1);     
       add_torus(tris, xvals[0], yvals[0], zvals[0],
                 xvals[1], yvals[1], step);
-      mul_tris(gstack, tris,zbuf, s,c);
+      mul_tris(gstack, tris,zbuf, s,view, ambient, light,
+               areflect,
+               dreflect, 
+               sreflect);
     }
     
 
@@ -233,6 +251,10 @@ void parse_file ( char * filename,
     //display
     else if ( check_str(line, "display")) {
       display(s);
+    }
+    else if ( check_str(line, "clear") ) {
+      clear_screen(s);
+      clear_zbuf(zbuf);
     }
 
     //save
